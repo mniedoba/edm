@@ -196,7 +196,7 @@ def distillation_loop(
 
         # Save network snapshot.
         if (snapshot_ticks is not None) and (done or cur_tick % snapshot_ticks == 0):
-            data = dict(ema=ema, loss_fn=loss_fn, augment_pipe=augment_pipe, dataset_kwargs=dict(dataset_kwargs))
+            data = dict(ema=target_net, loss_fn=loss_fn, augment_pipe=augment_pipe, dataset_kwargs=dict(dataset_kwargs))
             for key, value in data.items():
                 if isinstance(value, torch.nn.Module):
                     value = copy.deepcopy(value).eval().requires_grad_(False)

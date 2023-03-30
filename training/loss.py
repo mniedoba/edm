@@ -36,13 +36,13 @@ class CDLoss:
         self.eps = eps
         self.T = t_max
         self.solver = solver
-        self.dist_fnc = dist_fnc
+        # self.dist_fnc = dist_fnc
 
     def __call__(self, online_net, target_net, score_net, images, labels, augment_pipe=None):
         # sample random integer n ~ U[1, N-1]
         n = randint(1, self.N-1)
         rnd_normal = torch.randn([images.shape[0], 1, 1, 1], device=images.device)
-        t, t_prev = self.t(n+1), self.t(n)
+        t, t_prev = torch.tensor(self.t(n+1), device=images.device), torch.tensor(self.t(n), device=images.device)
         y, augment_labels = augment_pipe(images) if augment_pipe is not None else (images, None)
         noise = torch.randn_like(y) * t
 
@@ -51,7 +51,9 @@ class CDLoss:
         y_t_prev = y_t + (t_prev - t) * solver_dy
         weight = 1.  # This could be some weighting function.
 
-        loss = weight * self.dist_fnc(online_net(y_t, t), target_net(y_t_prev, t))
+        # loss = weight * self.dist_fnc(online_net(y_t, t), target_net(y_t_prev, t))
+        loss = weight * ((online_net(y_t, t) - target_net(y_t_prev, t)) ** 2)
+        print(loss.mean().item())
         return loss
 
     def t(self, n):
