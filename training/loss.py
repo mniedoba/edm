@@ -53,7 +53,6 @@ class CDLoss:
 
         # loss = weight * self.dist_fnc(online_net(y_t, t), target_net(y_t_prev, t))
         loss = weight * ((online_net(y_t, t) - target_net(y_t_prev, t)) ** 2)
-        print(loss.mean().item())
         return loss
 
     def t(self, n):

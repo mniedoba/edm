@@ -78,6 +78,10 @@ def distillation_loop(
     dist.print0('Constructing network...')
     interface_kwargs = dict(img_resolution=dataset_obj.resolution, img_channels=dataset_obj.num_channels,
                             label_dim=dataset_obj.label_dim)
+    score_net = dnnlib.util.construct_class_by_name(**network_kwargs,
+                                                     **interface_kwargs)
+    score_net.train().requires_grad_(False).to(device) # The score network we are distilling.
+    network_kwargs['sigma_min'] = 0.002
     online_net = dnnlib.util.construct_class_by_name(**network_kwargs,
                                                      **interface_kwargs)  # subclass of torch.nn.Module
     online_net.train().requires_grad_(True).to(device)
@@ -100,7 +104,6 @@ def distillation_loop(
     ddp = torch.nn.parallel.DistributedDataParallel(online_net, device_ids=[device], broadcast_buffers=False)
 
     target_net = copy.deepcopy(online_net).train().requires_grad_(False)  # The target network.
-    score_net = copy.deepcopy(online_net).train().requires_grad_(False)  # The score network we are distilling.
 
     # Resume training from previous snapshot.
     if resume_pkl is not None:

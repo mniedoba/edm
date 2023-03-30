@@ -13,15 +13,16 @@ from . import training_stats
 
 def init():
     if 'MASTER_ADDR' not in os.environ:
-        os.environ['MASTER_ADDR'] = 'localhost'
+        os.environ['MASTER_ADDR'] = os.environ.get("SLURM_NODELIST")
+        print(os.environ.get('MASTER_ADDR'))
     if 'MASTER_PORT' not in os.environ:
         os.environ['MASTER_PORT'] = '29500'
     if 'RANK' not in os.environ:
-        os.environ['RANK'] = '0'
+        os.environ['RANK'] = os.environ['SLURM_PROCID']
     if 'LOCAL_RANK' not in os.environ:
-        os.environ['LOCAL_RANK'] = '0'
+        os.environ['LOCAL_RANK'] = os.environ['SLURM_LOCALID']
     if 'WORLD_SIZE' not in os.environ:
-        os.environ['WORLD_SIZE'] = '1'
+        os.environ['WORLD_SIZE'] = os.environ['SLURM_NTASKS']
 
     backend = 'gloo' if os.name == 'nt' else 'nccl'
     torch.distributed.init_process_group(backend=backend, init_method='env://')
