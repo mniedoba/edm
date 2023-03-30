@@ -7,9 +7,48 @@
 
 """Loss functions used in the paper
 "Elucidating the Design Space of Diffusion-Based Generative Models"."""
+from random import randint
 
 import torch
 from torch_utils import persistence
+
+#----------------------------------------------------------------------------
+# Loss function corresponding to the consistency distillation objective in
+# "Consistency models".
+@persistence.persistent_class
+class CDLoss:
+
+    def __init__(self, N, rho, eps, t_max, solver, dist_fnc):
+        self.N = N
+        self.rho = rho
+        self.eps = eps
+        self.T = t_max
+        self.solver = solver
+        self.dist_fnc = dist_fnc
+
+    def __call__(self, online_net, target_net, score_net, images, labels, augment_pipe=None):
+        # sample random integer n ~ U[1, N-1]
+        n = randint(1, self.N-1)
+        rnd_normal = torch.randn([images.shape[0], 1, 1, 1], device=images.device)
+        t, t_prev = self.t(n+1), self.t(n)
+        y, augment_labels = augment_pipe(images) if augment_pipe is not None else (images, None)
+        noise = torch.randn_like(y) * t
+
+        y_t = y + noise
+        y_t_prev = y_t + (t_prev - t) * self.solver(y_t, t, score_net)
+        weight = 1.  # This could be some weighting function.
+
+        loss = weight * self.dist_fnc(online_net(y_t, t), target_net(y_t_prev, t))
+        return loss
+
+    def t(self, n):
+        """Equation (6) from Consistency Models."""
+        rho_inv = 1. / self.rho
+        start = self.eps ** rho_inv
+        end = self.T ** rho_inv
+        scale = (n - 1) / (self.N - 1)
+        t = (start + scale * (end - start)) ** self.rho
+        return t
 
 #----------------------------------------------------------------------------
 # Loss function corresponding to the variance preserving (VP) formulation
