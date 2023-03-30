@@ -12,13 +12,25 @@ from random import randint
 import torch
 from torch_utils import persistence
 
+def heun_update(net, x_cur, t_cur, t_next, class_labels=None):
+    # Euler step.
+    denoised = net(x_cur, t_cur, class_labels).to(torch.float64)
+    d_cur = (x_cur - denoised) / t_cur
+    x_next = x_cur + (t_next - t_cur) * d_cur
+
+    # Second order correction.
+    denoised_next = net(x_next, t_next, class_labels).to(torch.float64)
+    d_prime = (x_next - denoised_next) / t_next
+
+    return 0.5 * (d_cur + d_prime)
+
 #----------------------------------------------------------------------------
 # Loss function corresponding to the consistency distillation objective in
 # "Consistency models".
 @persistence.persistent_class
 class CDLoss:
 
-    def __init__(self, N, rho, eps, t_max, solver, dist_fnc):
+    def __init__(self, N=18, rho=7., eps=0.002, t_max=80, solver=heun_update, dist_fnc=lambda x, y: ((x - y) ** 2)):
         self.N = N
         self.rho = rho
         self.eps = eps
@@ -35,7 +47,8 @@ class CDLoss:
         noise = torch.randn_like(y) * t
 
         y_t = y + noise
-        y_t_prev = y_t + (t_prev - t) * self.solver(y_t, t, score_net)
+        solver_dy = self.solver(score_net, y_t, t, t_prev, labels)
+        y_t_prev = y_t + (t_prev - t) * solver_dy
         weight = 1.  # This could be some weighting function.
 
         loss = weight * self.dist_fnc(online_net(y_t, t), target_net(y_t_prev, t))

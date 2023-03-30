@@ -1,12 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-#
-# This work is licensed under a Creative Commons
-# Attribution-NonCommercial-ShareAlike 4.0 International License.
-# You should have received a copy of the license along with this
-# work. If not, see http://creativecommons.org/licenses/by-nc-sa/4.0/
-
-"""Train diffusion-based generative model using the techniques described in the
-paper "Elucidating the Design Space of Diffusion-Based Generative Models"."""
+"""Distill a EDM model using Consistency Distillation."""
 
 import os
 import re
@@ -15,7 +7,7 @@ import click
 import torch
 import dnnlib
 from torch_utils import distributed as dist
-from training import training_loop
+from training import distillation_loop
 
 import warnings
 warnings.filterwarnings('ignore', 'Grad strides do not match bucket view strides') # False warning printed by PyTorch 1.12.
@@ -133,7 +125,7 @@ def main(**kwargs):
     else:
         assert opts.precond == 'edm'
         c.network_kwargs.class_name = 'training.networks.EDMPrecond'
-        c.loss_kwargs.class_name = 'training.loss.EDMLoss'
+        c.loss_kwargs.class_name = 'training.loss.CDLoss'
 
     # Network options.
     if opts.cbase is not None:
@@ -226,7 +218,7 @@ def main(**kwargs):
         dnnlib.util.Logger(file_name=os.path.join(c.run_dir, 'log.txt'), file_mode='a', should_flush=True)
 
     # Train.
-    training_loop.training_loop(**c)
+    distillation_loop.distillation_loop(**c)
 
 #----------------------------------------------------------------------------
 
