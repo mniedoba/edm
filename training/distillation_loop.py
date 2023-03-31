@@ -12,6 +12,7 @@ import time
 import copy
 import json
 import pickle
+import PIL.Image
 import psutil
 import numpy as np
 import torch
@@ -23,7 +24,25 @@ from torch_utils import misc
 
 
 # ----------------------------------------------------------------------------
+def sample_grid(network, device, dest_path, gridw=4, gridh=4, t_max=80):
+    batch_size = gridw * gridh
 
+    # Pick latents and labels.
+    latents = torch.randn([batch_size, network.img_channels, network.img_resolution, network.img_resolution], device=device)
+    class_labels = None
+    if network.label_dim:
+        class_labels = torch.eye(network.label_dim, device=device)[
+            torch.randint(network.label_dim, size=[batch_size], device=device)]
+    t = torch.full([latents.shape[0], 1, 1, 1], t_max, device=latents.device)
+    # One shot samples.
+    samples = network(latents, t, class_labels)
+
+    # Save image grid.
+    image = (samples * 127.5 + 128).clip(0, 255).to(torch.uint8)
+    image = image.reshape(gridh, gridw, *image.shape[1:]).permute(0, 3, 1, 4, 2)
+    image = image.reshape(gridh * network.img_resolution, gridw * network.img_resolution, network.img_channels)
+    image = image.cpu().numpy()
+    PIL.Image.fromarray(image, 'RGB').save(dest_path)
 
 def distillation_loop(
         run_dir='.',  # Output directory.
@@ -243,9 +262,12 @@ def distillation_loop(
             stats_jsonl.flush()
             loss_mean = training_stats.default_collector.mean('Loss/loss')
             loss_std = training_stats.default_collector.std('Loss/loss')
+            sample_file = os.path.join(run_dir, 'samples.png')
+            sample_grid(online_ema, device, sample_file)
             wandb.log({'Loss/mean': loss_mean,
-                       'Loss/std': loss_std
-                      }, step=cur_nimg // 1000)  # Log avg loss over the tick plus a 95% CI.
+                       'Loss/std': loss_std,
+                       'Samples': wandb.Image(sample_file)
+                       }, step=cur_nimg // 1000)
         dist.update_progress(cur_nimg // 1000, total_kimg)
 
         # Update state.
