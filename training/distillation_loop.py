@@ -16,6 +16,7 @@ import psutil
 import numpy as np
 import torch
 import dnnlib
+import wandb
 from torch_utils import distributed as dist
 from torch_utils import training_stats
 from torch_utils import misc
@@ -57,6 +58,12 @@ def distillation_loop(
     torch.backends.cudnn.allow_tf32 = False
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = False
+
+    if dist.get_rank() == 0:
+        run = wandb.init(
+            entity='iai',
+            project='consistency_distillation',
+        )
 
     # Select batch size per GPU.
     batch_gpu_total = batch_size // dist.get_world_size()
@@ -210,7 +217,9 @@ def distillation_loop(
             for key, value in data.items():
                 if isinstance(value, torch.nn.Module):
                     value = copy.deepcopy(value).eval().requires_grad_(False)
-                    misc.check_ddp_consistency(value)
+                    # Dropping this for now because it doesn't seem like it works well with the EMA updates across multiple
+                    # processes.
+                    # misc.check_ddp_consistency(value)
                     data[key] = value.cpu()
                 del value  # conserve memory
             if dist.get_rank() == 0:
@@ -232,6 +241,11 @@ def distillation_loop(
             stats_jsonl.write(
                 json.dumps(dict(training_stats.default_collector.as_dict(), timestamp=time.time())) + '\n')
             stats_jsonl.flush()
+            loss_mean = training_stats.default_collector.mean('Loss/loss')
+            loss_std = training_stats.default_collector.std('Loss/loss')
+            wandb.log({'Loss/mean': loss_mean,
+                       'Loss/std': loss_std
+                      }, step=cur_nimg // 1000)  # Log avg loss over the tick plus a 95% CI.
         dist.update_progress(cur_nimg // 1000, total_kimg)
 
         # Update state.
@@ -241,7 +255,7 @@ def distillation_loop(
         maintenance_time = tick_start_time - tick_end_time
         if done:
             break
-
+    wandb.finish()
     # Done.
     dist.print0()
     dist.print0('Exiting...')

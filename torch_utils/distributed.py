@@ -29,7 +29,7 @@ def init():
         os.environ['LOCAL_RANK'] = os.environ.get('SLURM_LOCALID', '0')
     if 'WORLD_SIZE' not in os.environ:
         os.environ['WORLD_SIZE'] = os.environ.get('SLURM_NTASKS', '1')
-
+j
     backend = 'gloo' if os.name == 'nt' else 'nccl'
     torch.distributed.init_process_group(backend=backend, init_method='env://')
     torch.cuda.set_device(int(os.environ.get('LOCAL_RANK', '0')))
