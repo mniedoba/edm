@@ -79,9 +79,12 @@ def distillation_loop(
     torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = False
 
     if dist.get_rank() == 0:
-        run = wandb.init(
+        with open(os.path.join(run_dir, 'training_options.json'), 'r') as f:
+            config = json.loads(f.read())
+        wandb.init(
             entity='iai',
             project='consistency_distillation',
+            config=config
         )
 
     # Select batch size per GPU.
