@@ -27,9 +27,6 @@ def init():
     torch.distributed.init_process_group(backend=backend, init_method='env://')
     torch.cuda.set_device(int(os.environ.get('LOCAL_RANK', '0')))
 
-    print()
-
-
     sync_device = torch.device('cuda') if get_world_size() > 1 else None
     training_stats.init_multiprocessing(rank=get_rank(), sync_device=sync_device)
 

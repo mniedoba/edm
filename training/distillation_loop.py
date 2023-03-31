@@ -101,6 +101,7 @@ def distillation_loop(
                                                     **optimizer_kwargs)  # subclass of torch.optim.Optimizer
     augment_pipe = dnnlib.util.construct_class_by_name(
         **augment_kwargs) if augment_kwargs is not None else None  # training.augment.AugmentPipe
+    dist.print0(f'Number of present GPUs: {torch.cuda.device_count()}')
     ddp = torch.nn.parallel.DistributedDataParallel(online_net, device_ids=[device], broadcast_buffers=False)
 
     target_net = copy.deepcopy(online_net).train().requires_grad_(False)  # The target network.
@@ -209,7 +210,6 @@ def distillation_loop(
             for key, value in data.items():
                 if isinstance(value, torch.nn.Module):
                     value = copy.deepcopy(value).eval().requires_grad_(False)
-                    print(f'Checking {key}, Local Rank: {dist.get_rank()}}')
                     misc.check_ddp_consistency(value)
                     data[key] = value.cpu()
                 del value  # conserve memory
