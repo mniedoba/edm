@@ -10,16 +10,17 @@
 from random import randint
 
 import torch
+import PIL.Image
 from torch_utils import persistence
 
-def heun_update(net, x_cur, t_cur, t_next, class_labels=None):
+def heun_update(net, x_cur, t_cur, t_next, class_labels=None, augment_labels=None):
     # Euler step.
-    denoised = net(x_cur, t_cur, class_labels).to(torch.float64)
+    denoised = net(x_cur, t_cur, class_labels, augment_labels).to(torch.float64)
     d_cur = (x_cur - denoised) / t_cur
     x_next = x_cur + (t_next - t_cur) * d_cur
 
     # Second order correction.
-    denoised_next = net(x_next, t_next, class_labels).to(torch.float64)
+    denoised_next = net(x_next, t_next, class_labels, augment_labels).to(torch.float64)
     d_prime = (x_next - denoised_next) / t_next
 
     return 0.5 * (d_cur + d_prime)
@@ -47,12 +48,14 @@ class CDLoss:
         noise = torch.randn_like(y) * t
 
         y_t = y + noise
-        solver_dy = self.solver(score_net, y_t, t, t_prev, labels)
+        solver_dy = self.solver(score_net, y_t, t, t_prev, labels, augment_labels)
         y_t_prev = y_t + (t_prev - t) * solver_dy
         weight = 1.  # This could be some weighting function.
 
-        # loss = weight * self.dist_fnc(online_net(y_t, t), target_net(y_t_prev, t))
-        loss = weight * ((online_net(y_t, t) - target_net(y_t_prev, t_prev)) ** 2)
+        online_denoised = online_net(y_t, t, labels, augment_labels=augment_labels)
+        target_denoised = target_net(y_t_prev, t_prev, labels, augment_labels=augment_labels)
+
+        loss = weight * ((online_denoised - target_denoised) ** 2)
         return loss
 
     def t(self, n):
