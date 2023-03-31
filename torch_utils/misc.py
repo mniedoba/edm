@@ -183,6 +183,7 @@ def check_ddp_consistency(module, ignore_regex=None):
         fullname = type(module).__name__ + '.' + name
         if ignore_regex is not None and re.fullmatch(ignore_regex, fullname):
             continue
+        print(fullname)
         tensor = tensor.detach()
         if tensor.is_floating_point():
             tensor = nan_to_num(tensor)
