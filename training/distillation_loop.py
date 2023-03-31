@@ -209,7 +209,7 @@ def distillation_loop(
             for key, value in data.items():
                 if isinstance(value, torch.nn.Module):
                     value = copy.deepcopy(value).eval().requires_grad_(False)
-                    print(f'Checking {key}')
+                    print(f'Checking {key}, Local Rank: {dist.get_rank()}}')
                     misc.check_ddp_consistency(value)
                     data[key] = value.cpu()
                 del value  # conserve memory

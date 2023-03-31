@@ -189,6 +189,8 @@ def check_ddp_consistency(module, ignore_regex=None):
             tensor = nan_to_num(tensor)
         other = tensor.clone()
         torch.distributed.broadcast(tensor=other, src=0)
+        if not tensor == other.all():
+            print(tensor == other)
         assert (tensor == other).all(), fullname
 
 #----------------------------------------------------------------------------
