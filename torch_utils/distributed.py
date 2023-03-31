@@ -6,6 +6,7 @@
 # work. If not, see http://creativecommons.org/licenses/by-nc-sa/4.0/
 
 import os
+import re
 import torch
 from . import training_stats
 
@@ -13,7 +14,13 @@ from . import training_stats
 
 def init():
     if 'MASTER_ADDR' not in os.environ:
-        os.environ['MASTER_ADDR'] = os.environ.get("SLURM_NODELIST", "localhost")
+        slurm_nodelist = os.environ.get("SLURM_NODELIST")
+        if slurm_nodelist:
+            root_node = slurm_nodelist.split(" ")[0].split(",")[0]
+        else:
+            root_node = "127.0.0.1"
+        root_node = resolve_root_node_address(root_node)
+        os.environ["MASTER_ADDR"] = root_node
     if 'MASTER_PORT' not in os.environ:
         os.environ['MASTER_PORT'] = '29500'
     if 'RANK' not in os.environ:
@@ -29,6 +36,18 @@ def init():
 
     sync_device = torch.device('cuda') if get_world_size() > 1 else None
     training_stats.init_multiprocessing(rank=get_rank(), sync_device=sync_device)
+
+def resolve_root_node_address(root_node: str) -> str:
+    if "[" in root_node:
+        name, numbers = root_node.split("[", maxsplit=1)
+        number = numbers.split(",", maxsplit=1)[0]
+        if "-" in number:
+            number = number.split("-")[0]
+
+        number = re.sub("[^0-9]", "", number)
+        root_node = name + number
+
+    return root_node
 
 #----------------------------------------------------------------------------
 
