@@ -30,7 +30,7 @@ def heun_update(net, x_cur, t_cur, t_next, class_labels=None):
 @persistence.persistent_class
 class CDLoss:
 
-    def __init__(self, N=18, rho=7., eps=0.002, t_max=80, solver=heun_update, dist_fnc=lambda x, y: ((x - y) ** 2)):
+    def __init__(self, N=18, rho=7., eps=0.002, t_max=80, solver=heun_update):
         self.N = N
         self.rho = rho
         self.eps = eps
@@ -40,9 +40,9 @@ class CDLoss:
 
     def __call__(self, online_net, target_net, score_net, images, labels, augment_pipe=None):
         # sample random integer n ~ U[1, N-1]
-        n = randint(1, self.N-1)
-        rnd_normal = torch.randn([images.shape[0], 1, 1, 1], device=images.device)
-        t, t_prev = torch.tensor(self.t(n+1), device=images.device), torch.tensor(self.t(n), device=images.device)
+        # n = randint(1, self.N-1)
+        n = torch.randint(1, self.N-1, [images.shape[0], 1, 1, 1], device=images.device)
+        t, t_prev = self.t(n+1), self.t(n)
         y, augment_labels = augment_pipe(images) if augment_pipe is not None else (images, None)
         noise = torch.randn_like(y) * t
 
@@ -52,7 +52,7 @@ class CDLoss:
         weight = 1.  # This could be some weighting function.
 
         # loss = weight * self.dist_fnc(online_net(y_t, t), target_net(y_t_prev, t))
-        loss = weight * ((online_net(y_t, t) - target_net(y_t_prev, t)) ** 2)
+        loss = weight * ((online_net(y_t, t) - target_net(y_t_prev, t_prev)) ** 2)
         return loss
 
     def t(self, n):
