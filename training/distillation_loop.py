@@ -104,6 +104,7 @@ def distillation_loop(
     ddp = torch.nn.parallel.DistributedDataParallel(online_net, device_ids=[device], broadcast_buffers=False)
 
     target_net = copy.deepcopy(online_net).train().requires_grad_(False)  # The target network.
+    online_ema = copy.deepcopy(online_net).eval().requires_grad_(False)
 
     # Resume training from previous snapshot.
     if resume_pkl is not None:
@@ -157,13 +158,18 @@ def distillation_loop(
                 torch.nan_to_num(param.grad, nan=0, posinf=1e5, neginf=-1e5, out=param.grad)
         optimizer.step()
 
-        # Update EMA.
+        # Update Target Network.
+        for p_target, p_online in zip(target_net.parameters(), online_net.parameters()):
+            # TODO: Add option for linear interpolation (mu parameter in paper.)
+            p_target.copy_(p_online.detach())
+
+        # Update EMA for the online network.
         ema_halflife_nimg = ema_halflife_kimg * 1000
         if ema_rampup_ratio is not None:
             ema_halflife_nimg = min(ema_halflife_nimg, cur_nimg * ema_rampup_ratio)
         ema_beta = 0.5 ** (batch_size / max(ema_halflife_nimg, 1e-8))
-        for p_target, p_online in zip(target_net.parameters(), online_net.parameters()):
-            p_target.copy_(p_online.detach().lerp(p_target, ema_beta))
+        for p_ema, p_online in zip(online_ema.parameters(), online_net.parameters()):
+            p_ema.copy_(p_online.detach().lerp(p_ema, ema_beta))
 
         # Perform maintenance tasks once per tick.
         cur_nimg += batch_size
@@ -199,10 +205,11 @@ def distillation_loop(
 
         # Save network snapshot.
         if (snapshot_ticks is not None) and (done or cur_tick % snapshot_ticks == 0):
-            data = dict(ema=target_net, loss_fn=loss_fn, augment_pipe=augment_pipe, dataset_kwargs=dict(dataset_kwargs))
+            data = dict(ema=online_ema, loss_fn=loss_fn, augment_pipe=augment_pipe, dataset_kwargs=dict(dataset_kwargs))
             for key, value in data.items():
                 if isinstance(value, torch.nn.Module):
                     value = copy.deepcopy(value).eval().requires_grad_(False)
+                    print(f'Checking {key}')
                     misc.check_ddp_consistency(value)
                     data[key] = value.cpu()
                 del value  # conserve memory
