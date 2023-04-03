@@ -29,6 +29,7 @@ def sample_grid(network, device, dest_path, gridw=4, gridh=4, t_max=80):
 
     # Pick latents and labels.
     latents = torch.randn([batch_size, network.img_channels, network.img_resolution, network.img_resolution], device=device)
+    latents = latents * t_max
     class_labels = None
     if network.label_dim:
         class_labels = torch.eye(network.label_dim, device=device)[

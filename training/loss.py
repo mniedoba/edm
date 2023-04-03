@@ -42,7 +42,7 @@ class CDLoss:
     def __call__(self, online_net, target_net, score_net, images, labels, augment_pipe=None):
         # sample random integer n ~ U[1, N-1]
         # n = randint(1, self.N-1)
-        n = torch.randint(1, self.N-1, [images.shape[0], 1, 1, 1], device=images.device)
+        n = torch.randint(1, self.N, [images.shape[0], 1, 1, 1], device=images.device)
         t, t_prev = self.t(n+1), self.t(n)
         y, augment_labels = augment_pipe(images) if augment_pipe is not None else (images, None)
         noise = torch.randn_like(y) * t
